@@ -5,10 +5,8 @@
 param(
 [parameter(Mandatory = $True)]
 [string]$function,
-[parameter(Mandatory = $True)]
-[string]$filepath,
-[parameter(Mandatory = $True)]
-[string]$Key
+[parameter(Mandatory = $False)]
+[string]$filepath
 )
 
 $global:Zabbix_send = "C:\zabbix\zabbix_sender.exe -c C:\zabbix\zabbix_agentd.conf"
@@ -25,18 +23,18 @@ Function Send_Zabbix {
         [int64]$value
     )
     echo "$key : $value"
-	$cmd = "$Zabbix_send -k `"$key`" -o  `"$value`""
-	echo "$cmd"
+                $cmd = "$Zabbix_send -k `"$key`" -o  `"$value`""
+                echo "$cmd"
     Invoke-Expression $cmd 
     
 }
 Function Dir_Size {
 
-    #$Key= "Acronis_dir_size"
+    $Key= "Acronis_dir_size"
 
     if ($filepath -isnot [string]) {
-        Write-Host “ERROR: You must specify a file path!” `
-        -foregroundcolor “RED” -backgroundcolor “Black”;`
+        Write-Host "ERROR: You must specify a file path!" `
+        -foregroundcolor "RED" -backgroundcolor "Black";`
         $Value=999
         Send_Zabbix $Key $Value 
         return
@@ -47,12 +45,12 @@ Function Dir_Size {
 
         $file=dir $filepath\*.tib | Sort-Object CreationTime
         $size = $file | Measure-Object -property length -sum
-    	$Value = $size.sum
+                $Value = $size.sum
         Send_Zabbix $Key $Value
     }
     else 
     {
-        Write-Host “Failed to find” $filepath.ToUpper() -foregroundcolor “Red” -backgroundcolor “Black”
+        Write-Host "Failed to find" $filepath.ToUpper() -foregroundcolor "Red" -backgroundcolor "Black"
         $Value=999
         Send_Zabbix $Key $Value
         
@@ -60,11 +58,11 @@ Function Dir_Size {
 
 } #End Dir Size Function
 Function File_Age {
-    #$Key= "Acronis_file_age"
+    $Key= "Acronis_file_age"
 
     if ($filepath -isnot [string]) {
-        Write-Host “ERROR: You must specify a file path!” `
-        -foregroundcolor “RED” -backgroundcolor “Black”;`
+        Write-Host "ERROR: You must specify a file path!" `
+        -foregroundcolor "RED" -backgroundcolor "Black";`
         $Value=999
         Send_Zabbix $Key $Value 
         return
@@ -75,12 +73,59 @@ Function File_Age {
 
         $file=dir $filepath\*.tib | Sort-Object CreationTime
         $time = New-TimeSpan $($file[-1].LastWriteTime) $(get-date)
-        $Value = $time.totalhours
+        $Value = $time.hours
         Send_Zabbix $Key $Value
     }
     else 
     {
-        Write-Host “Failed to find” $filepath.ToUpper() -foregroundcolor “Red” -backgroundcolor “Black”
+        Write-Host "Failed to find" $filepath.ToUpper() -foregroundcolor "Red" -backgroundcolor "Black"
+        $Value=999
+        Send_Zabbix $Key $Value
+        
+    }
+}
+Function Replication_Age {
+                $Key= "AD_Replication_Age"
+                $result = repadmin /showrepl * /csv| ConvertFrom-Csv | sort-object 'Last Success Time'| Select-Object 'Last Success Time' 
+                $lastrep = New-TimeSpan $($result[0].'Last Success Time') $(get-date)
+                $Value = [int]$lastrep.TotalMinutes
+                Write-Host "$Value - Last successful Replication"
+                Send_Zabbix $Key $Value
+}
+
+Function File_Info {
+param (
+        [parameter(mandatory=$true)]
+        $filename
+)
+        
+
+    if ($filename -isnot [string]) {
+        Write-Host "ERROR: You must specify a file and name" `
+        -foregroundcolor "RED" -backgroundcolor "Black";`
+	$Key = "$($file.Basename)_Age"
+        $Value=999
+        Send_Zabbix $Key $Value 
+	$Key = "$($file.Basename)_Size"
+	Send_Zabbix $Key $Value
+        return
+    }
+    #verify $file exists as a path
+
+    if (Test-Path $filename) {
+        $file=dir $filename 
+        $Key = "$($file.Basename)_Age"
+        $time = New-TimeSpan $($file.LastWriteTime) $(get-date)
+        $Value = [int]$time.TotalHours
+        Send_Zabbix $Key $Value
+        $Key = "$($file.Basename)_Size"
+        $Value = [int]$($file.Length / 1MB)
+	Send_Zabbix $Key $Value
+        
+    }
+    else 
+    {
+        Write-Host "Failed to find" $filepath.ToUpper() -foregroundcolor "Red" -backgroundcolor "Black"
         $Value=999
         Send_Zabbix $Key $Value
         
@@ -89,7 +134,9 @@ Function File_Age {
 
 #### Starting here.... 
 switch ($function)  { 
-        File_Age {File_Age $filepath $Key} 
-        Dir_Size {Dir_Size $filepath $Key} 
-        default {"The function couldn't be determined, Options are File_Age and Dir_Size"}
-    }
+        File_Age {File_Age $filepath} 
+        Dir_Size {Dir_Size $filepath} 
+        Replication_Age {Replication_Age}
+        File_Info {File_Info $filepath}
+        default {"The function couldn't be determined, Options are File_Age, Dir_Size, Replication_Age, or File_Info <filename>"}
+}
