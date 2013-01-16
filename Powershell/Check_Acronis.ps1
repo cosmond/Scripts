@@ -159,6 +159,6 @@ switch ($function)  {
         Dir_Size {Dir_Size $filepath} 
         Replication_Age {Replication_Age}
         File_Info {File_Info $filepath}
-        Mbox_Count {Mbox_Count $server $mailbox}
-        default {"The function couldn't be determined, Options are File_Age, Dir_Size, Replication_Age, or File_Info <filename>"}
+        Mbox_Count {Mbox_Count $mailbox}
+        default {"The function couldn't be determined, Options are File_Age, Dir_Size, Replication_Age, File_Info <filename>, or Mbox_Count <mailbox>"}
 }
