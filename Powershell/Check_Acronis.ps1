@@ -132,11 +132,33 @@ param (
     }
 }
 
+Function Mbox_Count {
+    param (
+        [parameter(mandatory=$true)]
+        $mailbox
+    )
+    # Add-PSSnapin Microsoft.Exchange.Management.PowerShell.Admin -- Should be done via remote Powershell but who got time for that?
+    Add-PSSnapin Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue
+    if ($mailbox_stats=get-mailboxstatistics $mailbox) {
+        $Key = "${mailbox}_Count"
+        $Value = [int]$mailbox_stats.ItemCount
+        Write-Host "Send_Zabbix $Key $Value"
+    }
+    else {
+        $Key = "${mailbox}_Count"
+        $Value = 999
+        #Send_Zabbix $Key $Value
+        Write-Host 
+    }
+    
+}
+
 #### Starting here.... 
 switch ($function)  { 
         File_Age {File_Age $filepath} 
         Dir_Size {Dir_Size $filepath} 
         Replication_Age {Replication_Age}
         File_Info {File_Info $filepath}
+        Mbox_Count {Mbox_Count $server $mailbox}
         default {"The function couldn't be determined, Options are File_Age, Dir_Size, Replication_Age, or File_Info <filename>"}
 }
